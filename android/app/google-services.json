@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "177556883322",
+    "project_id": "link-2d273",
+    "storage_bucket": "link-2d273.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:177556883322:android:0471a8e633b06e7b29b8c3",
+        "android_client_info": {
+          "package_name": "com.link"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHS1nv6MimT1zzoHLP1aAcDNAb719nMOI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
