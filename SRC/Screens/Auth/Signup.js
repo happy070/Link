@@ -8,41 +8,30 @@ import Typography from '../../Components/Atoms/Typography/Typography';
 import uuid from 'react-native-uuid';
 import firestore from "@react-native-firebase/firestore";
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Signup = () => {
     const [Name, setName] = useState("");
-    const [Email, setEmail] = useState("");
     const [Mobile, setMobile] = useState("");
     const [Pin, setPin] = useState("");
-    const [ConfirmPin, setConfirmPin] = useState("");
     const [modalVisible, setModalVisible] = useState(false);  // State for modal visibility
     const [loading, setLoading] = useState(false);  // State for loader visibility
     const [successMessage, setSuccessMessage] = useState("");  // State for success message
     const navigation = useNavigation();
 
-    const Login = () =>{
+    const Login = () => {
         navigation.navigate("Login")
     }
+
     const Register = () => {
         // Validation checks
-        if (!Name || !Email || !Mobile || !Pin || !ConfirmPin) {
+        if (!Name || !Mobile || !Pin) {
             Alert.alert("Validation Error", "All fields are required.");
-            return;
-        }
-
-        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-        if (!emailRegex.test(Email)) {
-            Alert.alert("Validation Error", "Please enter a valid email address.");
             return;
         }
 
         if (Mobile.length !== 10 || isNaN(Mobile)) {
             Alert.alert("Validation Error", "Mobile number must be 10 digits.");
-            return;
-        }
-
-        if (Pin !== ConfirmPin) {
-            Alert.alert("Validation Error", "Passwords do not match.");
             return;
         }
 
@@ -56,7 +45,6 @@ const Signup = () => {
             .doc(userId)
             .set({
                 Name: Name,
-                Email: Email,
                 Mobile: Mobile,
                 Pin: Pin,
                 userId: userId,
@@ -90,18 +78,18 @@ const Signup = () => {
                 }}
                 keyboardShouldPersistTaps="handled"
             >
-             <View style={{marginBottom:20,flexDirection:"column",alignSelf:"flex-start",paddingHorizontal:30}}>
-                <View style={{flexDirection:"row"}}>
-                <Typography color='white' fontSize={responsiveFontSize(2)} fontWeight='600' lineHeight={25} >Signup</Typography>
-                <Text style={{lineHeight:25}}> 🔗</Text>
+                <View style={{ marginBottom: 20, flexDirection: "column", alignSelf: "flex-start", paddingHorizontal: 30 }}>
+                    <View style={{ flexDirection: "row" }}>
+                        <Typography color='white' fontSize={responsiveFontSize(2)} fontWeight='600' lineHeight={25} >Signup</Typography>
+                        <Text style={{ lineHeight: 25 }}> 🔗</Text>
+                    </View>
+                    <Typography color='#FFA500' fontSize={responsiveFontSize(2)} fontWeight='600' lineHeight={25}>Let's Build Your Link Profile</Typography>
                 </View>
-                <Typography color='#FFA500' fontSize={responsiveFontSize(2)} fontWeight='600' lineHeight={25}>Let's Build Your Link Profile</Typography>
-             </View>
                 <Card
                     backgroundColor="white"
                     borderRadius={15}
                     alignItems="center"
-                    height={responsiveHeight(60)}
+                    height={responsiveHeight(50)} // Adjusted height due to fewer fields
                     width={responsiveWidth(90)}
                     style={{ marginBottom: 50 }}
                 >
@@ -111,32 +99,20 @@ const Signup = () => {
                         </Typography>
                         <CustomTextInput placeholder="Enter Your Name" width={responsiveWidth(80)} onChangeText={(event) => { setName(event) }} />
                     </View>
-                    <View style={{ marginTop: 0 }}>
-                        <Typography color="grey" fontSize={responsiveFontSize(2)} fontWeight="700" lineHeight={26}>
-                            Email
-                        </Typography>
-                        <CustomTextInput placeholder="Enter Your Email" width={responsiveWidth(80)} onChangeText={(event) => { setEmail(event) }} />
-                    </View>
-                    <View style={{ marginTop: 0 }}>
+                    <View style={{ marginTop: 10 }}>
                         <Typography color="grey" fontSize={responsiveFontSize(2)} fontWeight="700" lineHeight={26}>
                             Mobile
                         </Typography>
                         <CustomTextInput inputMode='numeric' placeholder="Enter Your Mobile" width={responsiveWidth(80)} onChangeText={(event) => { setMobile(event) }} />
                     </View>
-                    <View style={{ marginTop: 0 }}>
+                    <View style={{ marginTop: 10 }}>
                         <Typography color="grey" fontSize={responsiveFontSize(2)} fontWeight="700" lineHeight={26}>
                             Pin
                         </Typography>
                         <CustomTextInput inputMode='numeric' placeholder="Enter Your Pin" width={responsiveWidth(80)} onChangeText={(event) => { setPin(event) }} />
                     </View>
-                    <View style={{ marginTop: 0 }}>
-                        <Typography color="grey" fontSize={responsiveFontSize(2)} fontWeight="700" lineHeight={26}>
-                            Confirm Pin
-                        </Typography>
-                        <CustomTextInput inputMode='numeric' placeholder="Re-Enter Your Pin" width={responsiveWidth(80)} onChangeText={(event) => { setConfirmPin(event) }} />
-                    </View>
 
-                    <View>
+                    <View style={{ marginTop: 10 }}>
                         <Typography color='black' fontSize={responsiveFontSize(2)} fontWeight='600' onPress={Login}>Already Have Account? Login</Typography>
                     </View>
                 </Card>

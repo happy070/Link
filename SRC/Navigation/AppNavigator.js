@@ -1,22 +1,17 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabsNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Splash from '../Screens/Splash';
 import Signup from '../Screens/Auth/Signup';
 import Login from '../Screens/Auth/Login';
 import Dashboard from '../Screens/Dashboard/Dashboard';
+import Chat from '../Screens/Chat/Chat';
 import { View, Text } from 'react-native';
+import HomeIcon from '../Assests/Icon/HomeIcon'; // Ensure the path is correct
+import SettingsIcon from '../Assests/Icon/SettingIcon'; // Import the new SettingsIcon
 
-// Placeholder components for the other tab screens
-const ProfileTab = () => {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Profile Tab</Text>
-    </View>
-  );
-};
 
 const SettingsTab = () => {
   return (
@@ -27,7 +22,7 @@ const SettingsTab = () => {
 };
 
 // Bottom Tab Navigator for Dashboard
-const Tab = createBottomTabsNavigator();
+const Tab = createBottomTabNavigator();
 
 const DashboardTabs = () => {
   return (
@@ -36,22 +31,19 @@ const DashboardTabs = () => {
         headerShown: false,
         tabBarStyle: { backgroundColor: '#fff' },
         tabBarIcon: ({ color, size }) => {
-          let iconName;
           if (route.name === 'Home') {
-            iconName = 'home';
-          } else if (route.name === 'Profile') {
-            iconName = 'person';
-          } else if (route.name === 'Settings') {
-            iconName = 'settings';
+            // Use HomeIcon SVG for Home tab
+            return <HomeIcon color={color} width={size} height={size} />;
+          }else if (route.name === 'Settings') {
+            // Use SettingsIcon SVG for Settings tab
+            return <SettingsIcon color={color} width={size} height={size} />;
           }
-          return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: 'gray',
       })}
     >
       <Tab.Screen name="Home" component={Dashboard} />
-      <Tab.Screen name="Profile" component={ProfileTab} />
       <Tab.Screen name="Settings" component={SettingsTab} />
     </Tab.Navigator>
   );
@@ -68,6 +60,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Signup" component={Signup} options={{ headerShown: false }} />
         <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
         <Stack.Screen name="Dashboard" component={DashboardTabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Chat" component={Chat} options={{ headerShown: true }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

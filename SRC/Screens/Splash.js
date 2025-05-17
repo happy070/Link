@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native'
 const Splash = () => {
    const navigation = useNavigation();
     const onComplete=()=>{
-      navigation.navigate("Signup");
+      navigation.navigate("Login");
     }
   return (
     <View style={{flex:1, backgroundColor: "black", justifyContent: "center", alignItems: "center"}}>
