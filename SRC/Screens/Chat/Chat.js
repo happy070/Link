@@ -1,7 +1,7 @@
 import { View, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Text } from 'react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { GiftedChat, InputToolbar, Bubble } from 'react-native-gifted-chat';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useIsFocused } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -10,17 +10,28 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const route = useRoute();
   const { data, id } = route.params;
-
+  const isDeleting = useRef(false); // Prevent concurrent deletions
+  const isMounted = useRef(true); // Track component mount state
+  const deleteTimeout = useRef(null); // Debounce deletion
+  const isFocused = useIsFocused(); // Check if screen is focused
   const chatId = [id, data.userId].sort().join('_');
 
   useEffect(() => {
+    console.log('Chat component mounted, chatId:', chatId);
+    isMounted.current = true;
+
     const unsubscribe = firestore()
       .collection('chats')
       .doc(chatId)
       .collection('messages')
       .orderBy('createdAt', 'desc')
       .onSnapshot(
-        (querySnapshot) => {
+        async (querySnapshot) => {
+          if (!isMounted.current || !isFocused) {
+            console.log('Skipping onSnapshot update: component unmounted or not focused');
+            return;
+          }
+
           const messagesFirestore = querySnapshot.docs.map((doc) => {
             const messageData = doc.data();
             return {
@@ -35,7 +46,46 @@ const Chat = () => {
               },
             };
           });
+
+          console.log('Fetched messages:', messagesFirestore.length, 'Messages:', messagesFirestore.map(m => m.text));
+
+          // Update state
           setMessages(messagesFirestore);
+
+          // Delete oldest messages if count >= 4
+          if (messagesFirestore.length >= 4 && !isDeleting.current && isMounted.current && isFocused) {
+            console.log('Triggering deleteOldestMessages, message count:', messagesFirestore.length);
+            if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
+            deleteTimeout.current = setTimeout(async () => {
+              if (!isMounted.current || !isFocused || isDeleting.current) return;
+              isDeleting.current = true;
+
+              try {
+                const messagesRef = firestore()
+                  .collection('chats')
+                  .doc(chatId)
+                  .collection('messages')
+                  .orderBy('createdAt', 'asc') // Oldest first
+                  .limit(messagesFirestore.length - 2); // Keep latest 2
+
+                const snapshot = await messagesRef.get();
+                console.log('Messages to delete:', snapshot.docs.length, 'Message IDs:', snapshot.docs.map(doc => doc.id));
+
+                if (!snapshot.empty) {
+                  const batch = firestore().batch();
+                  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                  await batch.commit();
+                  console.log('Oldest messages deleted, keeping latest 2');
+                } else {
+                  console.log('No messages to delete');
+                }
+              } catch (error) {
+                console.error('Error deleting oldest messages:', error);
+              } finally {
+                isDeleting.current = false;
+              }
+            }, 1000); // 1-second debounce
+          }
         },
         (error) => {
           console.error('Error fetching messages:', error);
@@ -43,63 +93,12 @@ const Chat = () => {
       );
 
     return () => {
+      console.log('Chat component unmounting, chatId:', chatId);
+      isMounted.current = false;
       unsubscribe();
-      // Do NOT call deleteChatMessages here unless intentionally clearing the chat
+      if (deleteTimeout.current) clearTimeout(deleteTimeout.current);
     };
-  }, [chatId, id, data.Name, data.ProfilePicture]);
-
-  // Move deleteOldestMessages to a separate useEffect to avoid race conditions
-  useEffect(() => {
-    if (messages.length >= 4) {
-      deleteOldestMessages();
-    }
-  }, [messages.length]);
-
-  const deleteChatMessages = async () => {
-    try {
-      const messagesRef = firestore()
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages');
-
-      const snapshot = await messagesRef.get();
-      if (snapshot.empty) return;
-
-      const batch = firestore().batch();
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-
-      console.log('Chat messages deleted successfully');
-    } catch (error) {
-      console.error('Error deleting chat messages:', error);
-    }
-  };
-
-  const deleteOldestMessages = async () => {
-    try {
-      const messagesRef = firestore()
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('createdAt', 'asc') // Oldest first
-        .limit(2); // Get the two oldest messages
-
-      const snapshot = await messagesRef.get();
-      if (snapshot.empty) return;
-
-      const batch = firestore().batch();
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-
-      console.log('Two oldest messages deleted successfully');
-    } catch (error) {
-      console.error('Error deleting oldest messages:', error);
-    }
-  };
+  }, [chatId, id, data.Name, data.ProfilePicture, isFocused]);
 
   const handleImagePick = async () => {
     const options = {
@@ -131,13 +130,15 @@ const Chat = () => {
         createdAt: firestore.FieldValue.serverTimestamp(),
       };
 
-      setMessages((previousMessages) => GiftedChat.append(previousMessages, imageMessage));
-      await firestore()
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .add(imageMessage);
-      console.log('Image message sent successfully!');
+      if (isMounted.current && isFocused) {
+        setMessages((previousMessages) => GiftedChat.append(previousMessages, imageMessage));
+        await firestore()
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .add(imageMessage);
+        console.log('Image message sent successfully!');
+      }
     } catch (error) {
       console.error('Error uploading image:', error);
     }
@@ -156,13 +157,15 @@ const Chat = () => {
       };
 
       try {
-        setMessages((previousMessages) => GiftedChat.append(previousMessages, finalMsg));
-        await firestore()
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add(finalMsg);
-        console.log('Text message sent successfully!');
+        if (isMounted.current && isFocused) {
+          setMessages((previousMessages) => GiftedChat.append(previousMessages, finalMsg));
+          await firestore()
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .add(finalMsg);
+          console.log('Text message sent successfully:', finalMsg.text);
+        }
       } catch (error) {
         console.error('Error sending text message:', error);
       }
@@ -170,48 +173,40 @@ const Chat = () => {
     [chatId, id, data.userId]
   );
 
-  const renderBubble = (props) => {
-    return (
-      <Bubble
-        {...props}
-        wrapperStyle={{
-          right: {
-            backgroundColor: '#007AFF',
-            borderRadius: 15,
-            padding: 5,
-            marginRight: 10,
-            marginVertical: 5,
-          },
-          left: {
-            backgroundColor: '#000000',
-            borderRadius: 15,
-            padding: 5,
-            marginLeft: 10,
-            marginVertical: 5,
-          },
-        }}
-        textStyle={{
-          right: {
-            color: '#FFFFFF',
-          },
-          left: {
-            color: '#FFFFFF',
-          },
-        }}
-      />
-    );
-  };
+  const renderBubble = (props) => (
+    <Bubble
+      {...props}
+      wrapperStyle={{
+        right: {
+          backgroundColor: '#007AFF',
+          borderRadius: 15,
+          padding: 5,
+          marginRight: 10,
+          marginVertical: 5,
+        },
+        left: {
+          backgroundColor: '#000000',
+          borderRadius: 15,
+          padding: 5,
+          marginLeft: 10,
+          marginVertical: 5,
+        },
+      }}
+      textStyle={{
+        right: { color: '#FFFFFF' },
+        left: { color: '#FFFFFF' },
+      }}
+    />
+  );
 
-  const renderInputToolbar = (props) => {
-    return (
-      <View style={styles.inputToolbar}>
-        <TouchableOpacity onPress={handleImagePick} style={styles.imageButton}>
-          <Text style={styles.imageButtonText}>📷</Text>
-        </TouchableOpacity>
-        <InputToolbar {...props} containerStyle={styles.inputContainer} />
-      </View>
-    );
-  };
+  const renderInputToolbar = (props) => (
+    <View style={styles.inputToolbar}>
+      <TouchableOpacity onPress={handleImagePick} style={styles.imageButton}>
+        <Text style={styles.imageButtonText}>📷</Text>
+      </TouchableOpacity>
+      <InputToolbar {...props} containerStyle={styles.inputContainer} />
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -222,10 +217,7 @@ const Chat = () => {
       <GiftedChat
         messages={messages}
         onSend={(newMessages) => onSend(newMessages)}
-        user={{
-          _id: id,
-          name: 'You',
-        }}
+        user={{ _id: id, name: 'You' }}
         renderBubble={renderBubble}
         renderInputToolbar={renderInputToolbar}
       />
@@ -234,21 +226,15 @@ const Chat = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   inputToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  imageButton: {
-    padding: 10,
-  },
-  imageButtonText: {
-    fontSize: 24,
-  },
+  imageButton: { padding: 10 },
+  imageButtonText: { fontSize: 24 },
   inputContainer: {
     flex: 1,
     borderRadius: 20,
